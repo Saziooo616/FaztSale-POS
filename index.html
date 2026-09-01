@@ -186,6 +186,23 @@ const CLIENT_CONFIG = {
 
   <div id="export-reminder-banner" class="banner warn admin-only" style="display:none; font-size:12px;"></div>
 
+  <!-- Backup reminder modal: the inline banner above already existed but is
+       easy to scroll past — it's exactly the kind of thing that got skipped
+       right before a real data-loss incident. This is the same underlying
+       lastExportAt check, just made impossible to miss: a blocking dialog
+       instead of a line of small text, shown at boot and re-shown
+       periodically on long-running sessions until acted on. -->
+  <div id="backup-reminder-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:10000; align-items:center; justify-content:center; padding:16px;">
+    <div style="background:var(--card); border-radius:var(--radius); max-width:440px; width:100%; padding:28px; border:2px solid var(--warn, #b45309);">
+      <h2 style="margin:0 0 10px; font-family:'Arial Black',Impact,sans-serif; font-size:17px;">Back up before something goes wrong</h2>
+      <p id="backup-reminder-modal-text" style="margin:0 0 20px; font-size:13px; line-height:1.5;"></p>
+      <div style="display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap;">
+        <button class="btn" onclick="dismissBackupModal()">Not now</button>
+        <button class="btn" style="font-weight:bold;" onclick="exportFullDB()">Export backup now</button>
+      </div>
+    </div>
+  </div>
+
   <div id="sync-status-strip" class="banner" style="display:none; background:var(--paper); border:1px solid var(--line-strong); align-items:center; justify-content:space-between; gap:10px; font-size:12px; flex-wrap:wrap;">
     <span id="sync-status-text">Nothing to sync yet.</span>
     <div style="display:flex; align-items:center; gap:12px;">
@@ -3056,6 +3073,11 @@ async function autoPullTick(){
   finally { autoPullInFlight = false; }
 }
 setInterval(() => { autoPullTick(); }, 10 * 60 * 1000);
+// Re-check the backup reminder periodically too, not just once at boot —
+// otherwise a device left open for days would keep showing a "3 days ago"
+// modal from the moment it loaded, never escalating as it gets more overdue,
+// and never re-nagging after a "Not now" if the tab is just left open.
+setInterval(() => { refreshExportReminder(); }, 60 * 60 * 1000);
 async function compareAdminVsFirestore(){
   // Two guesses in a row (ghosts, then stuck-archived) haven't fully closed
   // the gap the person is seeing, or the fix hasn't been confirmed against
@@ -3496,23 +3518,72 @@ async function exportFullDB(){
   }
 }
 const EXPORT_REMINDER_DAYS = 3;
+// How long the blocking modal stays dismissed before it's allowed to
+// reappear in the same session. Not persisted on purpose — reloading the
+// app (or a new day's first login) always re-evaluates from scratch, so
+// "Not now" can't turn into "never again" across a restart.
+const BACKUP_MODAL_RENAG_HOURS = 4;
+let lastBackupModalShownAt = 0;
+let backupModalDismissedThisSession = false;
+
 async function refreshExportReminder(){
   const el = document.getElementById('export-reminder-banner');
-  if (!el) return;
-  if (!isAdmin) { el.style.display = 'none'; return; }
+  if (el) {
+    if (!isAdmin) {
+      el.style.display = 'none';
+    } else {
+      const last = await metaGet('lastExportAt');
+      if (!last) {
+        el.textContent = 'No full backup has ever been downloaded on this device. If this browser/device is lost or its storage is cleared, all data goes with it — export a backup now.';
+        el.style.display = 'block';
+      } else {
+        const daysSince = (Date.now() - last) / 86400000;
+        if (daysSince >= EXPORT_REMINDER_DAYS) {
+          el.textContent = `Last full backup was ${daysSince.toFixed(1)} days ago (${new Date(last).toLocaleString()}). This data only lives in this browser — export a fresh backup regularly.`;
+          el.style.display = 'block';
+        } else {
+          el.style.display = 'none';
+        }
+      }
+    }
+  }
+  await maybeShowBackupModal();
+}
+
+async function maybeShowBackupModal(){
+  if (!isAdmin || isOwnerSession) return;
+  const modal = document.getElementById('backup-reminder-modal');
+  if (!modal) return;
   const last = await metaGet('lastExportAt');
-  if (!last) {
-    el.textContent = 'No full backup has ever been downloaded on this device. If this browser/device is lost or its storage is cleared, all data goes with it — export a backup now.';
-    el.style.display = 'block';
-    return;
+  const daysSince = last ? (Date.now() - last) / 86400000 : Infinity;
+  const overdue = daysSince >= EXPORT_REMINDER_DAYS;
+  if (!overdue) { modal.style.display = 'none'; return; }
+
+  const hoursSinceShown = (Date.now() - lastBackupModalShownAt) / 3600000;
+  // Show it the first time it's overdue in this session regardless of the
+  // "not now" cooldown below, then respect the cooldown for re-nagging on
+  // long-running sessions so it doesn't reappear every single check.
+  const shouldShow = !backupModalDismissedThisSession || hoursSinceShown >= BACKUP_MODAL_RENAG_HOURS;
+  if (!shouldShow) return;
+
+  const textEl = document.getElementById('backup-reminder-modal-text');
+  if (textEl) {
+    textEl.textContent = last
+      ? `Last full backup was ${daysSince.toFixed(1)} days ago. This device's data — every part, price, and sale — only exists here and in Firestore. If either gets wiped or deleted with no recent backup, it's gone for good, not just reset.`
+      : `This device has never had a full backup downloaded. If this browser or device is lost, reset, or its storage is cleared, everything goes with it — permanently, not just reset.`;
   }
-  const daysSince = (Date.now() - last) / 86400000;
-  if (daysSince >= EXPORT_REMINDER_DAYS) {
-    el.textContent = `Last full backup was ${daysSince.toFixed(1)} days ago (${new Date(last).toLocaleString()}). This data only lives in this browser — export a fresh backup regularly.`;
-    el.style.display = 'block';
-  } else {
-    el.style.display = 'none';
-  }
+  modal.style.display = 'flex';
+  lastBackupModalShownAt = Date.now();
+  backupModalDismissedThisSession = false; // it's showing again now, so the next dismissal should count fresh
+}
+function closeBackupModal(){
+  const modal = document.getElementById('backup-reminder-modal');
+  if (modal) modal.style.display = 'none';
+  refreshExportReminder();
+}
+function dismissBackupModal(){
+  backupModalDismissedThisSession = true;
+  closeBackupModal();
 }
 async function importFullDB(file){
   if (!file) return;
