@@ -2257,9 +2257,16 @@ async function ensureBranchIdSet(){
 async function pullBranchFromFirestore(branchId){
   const { dbFs, collection, getDocs } = window.__fsSync;
   const partsSnap = await getDocs(collection(dbFs, 'branches', branchId, 'parts'));
-  const { map: costMap, error: costError } = await getOwnerCostMap(branchId); // reuses the same collectionGroup cost query the Owner view uses
+  const { map: costMap, error: costError, code: costErrorCode } = await getOwnerCostMap(branchId); // reuses the same collectionGroup cost query the Owner view uses
   if (costError) {
-    alert(`Warning: cost data couldn't be read while pulling this branch (${costError}).\n\nEvery part is being seeded with cost = 0 as a result — this is very likely a missing Firestore index for the costData collectionGroup query. Check the browser console (F12) for a Firebase link to create it, then pull again.`);
+    // Dropped the "very likely a missing Firestore index" guess — the raw
+    // Firestore error text here is "Missing or insufficient permissions",
+    // which is the standard wording for a security-rules denial, not for a
+    // missing index (that error normally comes with a direct "create this
+    // index" link instead). costErrorCode is the actual way to tell:
+    // 'permission-denied' means check the rules, 'failed-precondition'
+    // means it really is an index — check the browser console for it.
+    alert(`Warning: cost data couldn't be read while pulling this branch${costErrorCode ? ` [${costErrorCode}]` : ''} (${costError}).\n\nEvery part is being seeded with cost = 0 as a result. Check the browser console (F12) for the full error and its code, then pull again once it's resolved.`);
   }
   const records = [];
   partsSnap.forEach(d => {
@@ -3129,7 +3136,7 @@ async function compareAdminVsFirestore(){
     alert('Could not read Firestore for comparison: ' + (e && e.message ? e.message : e));
     return;
   }
-  const { map: fsCostMap, error: costError } = await getOwnerCostMap(branchId);
+  const { map: fsCostMap, error: costError, code: costErrorCode } = await getOwnerCostMap(branchId);
 
   const missing = [];        // active locally, no Firestore doc at all
   const incomplete = [];     // exists, but no brand or no part
@@ -3179,9 +3186,15 @@ async function compareAdminVsFirestore(){
   if (stuckArchived.length) lines.push('', `Stuck-archived (first 5): ${stuckArchived.slice(0,5).map(fmt).join('; ')}`);
   if (priceDiff.length) lines.push('', `Price diffs (first 5): ${priceDiff.slice(0,5).map(x => `${fmt(x.rec)} local=₱${x.localPrice} firestore=₱${x.fsPrice}`).join('; ')}`);
   if (costDiff.length) lines.push('', `Cost diffs (first 5): ${costDiff.slice(0,5).map(x => `${fmt(x.rec)} local=₱${x.localCost} firestore=₱${x.fsCost}`).join('; ')}`);
-  if (costError) lines.push('', `Cost comparison SKIPPED — the cost query itself failed (${costError}), most likely a missing Firestore index. This is not the same as costs actually matching; it means they couldn't be checked at all.`);
+  // Dropped the "most likely a missing Firestore index" guess from this
+  // message — the raw text Firestore actually returns ("Missing or
+  // insufficient permissions") is its standard wording for a rules
+  // denial, not for a missing index, so that guess was probably wrong.
+  // costErrorCode (now captured) is the real way to tell them apart:
+  // 'permission-denied' means rules, 'failed-precondition' means index.
+  if (costError) lines.push('', `Cost comparison SKIPPED — the cost query itself failed${costErrorCode ? ` [${costErrorCode}]` : ''}: ${costError}. This is not the same as costs actually matching; it means they couldn't be checked at all.`);
 
-  console.log('Full comparison:', { missing, incomplete, stuckArchived, priceDiff, qtyDiff, costDiff, localArchivedButFsNot, costError });
+  console.log('Full comparison:', { missing, incomplete, stuckArchived, priceDiff, qtyDiff, costDiff, localArchivedButFsNot, costError, costErrorCode });
   lines.push('', 'Full lists logged to the browser console (F12 → Console) if you need every item, not just the first 5 of each.');
   alert(lines.join('\n'));
 }
@@ -3864,8 +3877,15 @@ async function getOwnerCostMap(branchId){
     snap.forEach(d => { const data = d.data(); if (data.partKey) map[data.partKey] = data.cost || 0; });
     return { map, error: null };
   } catch(e) {
-    console.warn('Cost data unavailable:', e.message);
-    return { map, error: (e && e.message) ? e.message : String(e) };
+    // Log the FULL error, not just .message — a Firestore error's .code
+    // (e.g. 'permission-denied' vs 'failed-precondition') is the actual
+    // way to tell a rules problem apart from a missing-index problem.
+    // .message alone can say something generic like "Missing or
+    // insufficient permissions" even when the real cause is a missing
+    // index, so this was previously indistinguishable from the console.
+    console.warn('Cost data unavailable — full error for diagnosis:', e);
+    console.warn('Cost data unavailable — code:', e && e.code, '| message:', e && e.message);
+    return { map, error: (e && e.message) ? e.message : String(e), code: (e && e.code) || null };
   }
 }
 async function renderOwnerInventory(branchId, forceRefresh){
