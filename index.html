@@ -2637,6 +2637,25 @@ async function processSyncQueue(auto){
   try {
     const { dbFs, doc, setDoc, deleteDoc, runTransaction, increment, serverTimestamp } = window.__fsSync;
     const deviceId = await getDeviceId();
+    // A branch's parent doc (branches/{branchId}) only used to get created by
+    // the manual "Push Baseline" button. Ordinary part syncs write straight
+    // to branches/{branchId}/parts/{key} and never touch it — which is fine
+    // right up until the parent doc doesn't exist at all (e.g. right after a
+    // full branch delete). Firestore then treats it as a phantom: the parts
+    // subcollection is genuinely there and readable directly, but it won't
+    // show up in a plain listing of the top-level `branches` collection —
+    // which is exactly how the Owner screen finds branches to pick from.
+    // Net effect: real data in Firestore, invisible to Owner, no error shown
+    // anywhere. Do this once per branch per device (tracked locally, not a
+    // per-sync-cycle write) so it self-heals the first time this device
+    // syncs anything, without adding a recurring write to every cycle.
+    const ensuredKey = 'branchDocEnsuredFor:' + branchId;
+    if (!(await metaGet(ensuredKey))) {
+      try {
+        await setDoc(doc(dbFs, 'branches', branchId), { name: branchId, updatedAt: serverTimestamp() }, { merge: true });
+        await metaPut(ensuredKey, Date.now());
+      } catch (e) { console.warn('Could not ensure branch doc exists (will retry next sync):', e); }
+    }
     for (const op of ops) {
       try {
         const opType = op.type || 'partDelta'; // ops queued before this update have no type — treat as the original stock-delta behavior
