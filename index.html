@@ -23,6 +23,8 @@
     --green:#166534; --green-bg:#DCFCE7;
     --red:#991B1B; --red-bg:#FEE2E2;
     --radius:10px;
+    --dur-micro:120ms; --dur-layout:220ms;
+    --ease-standard:cubic-bezier(0.4,0,0.2,1);
   }
   *{box-sizing:border-box;}
   body{margin:0; background:var(--paper); color:var(--ink); font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif; font-size:15px; line-height:1.45; -webkit-font-smoothing:antialiased;}
@@ -38,21 +40,35 @@
   .role-row{display:flex; gap:8px; margin-bottom:16px;}
   .role-btn{flex:1; padding:10px; border:1.5px solid var(--ink); background:var(--card); border-radius:var(--radius); font-family:'Courier New',Consolas,monospace; font-size:12px; font-weight:600; cursor:pointer; text-transform:uppercase; color:var(--steel);}
   .role-btn.active{background:var(--ink); color:var(--paper);}
-  nav.tabs{display:flex; gap:6px; margin-bottom:18px; flex-wrap:wrap;}
-  .tab{flex:1; min-width:80px; padding:10px 6px; border:1px solid var(--line-strong); background:var(--card); border-radius:var(--radius); font-family:'Arial Black',Impact,sans-serif; font-size:13px; font-weight:600; cursor:pointer; color:var(--steel); text-align:center; text-transform:uppercase;}
+  nav.tabs{display:flex; gap:6px; margin-bottom:18px; flex-wrap:wrap; position:relative;}
+  .tab{flex:1; min-width:80px; padding:10px 6px; border:1px solid var(--line-strong); background:var(--card); border-radius:var(--radius); font-family:'Arial Black',Impact,sans-serif; font-size:13px; font-weight:600; cursor:pointer; color:var(--steel); text-align:center; text-transform:uppercase;
+    transition: color var(--dur-layout) var(--ease-standard), border-color var(--dur-layout) var(--ease-standard), transform var(--dur-micro) ease, box-shadow var(--dur-micro) ease;}
+  .tab:hover{transform:translateY(-2px); box-shadow:0 4px 10px rgba(17,24,39,0.12);}
+  .tab:active{transform:scale(0.96); box-shadow:none;}
   .tab.active{border-color:var(--ink); background:var(--ink); color:var(--amber);}
-  .panel{background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:20px; display:none;}
+  /* Sliding-pill tabs: only the main Sell/Inventory/History nav gets the pill treatment.
+     Higher specificity than .tab/.tab.active above so it doesn't touch brand-sheet or owner tabs. */
+  #staff-tabs .tab{position:relative; z-index:1; background:transparent; border-color:transparent;}
+  #staff-tabs .tab.active{background:transparent; border-color:transparent;}
+  #staff-tabs .tab-slider{position:absolute; top:0; left:0; height:100%; background:var(--ink); border-radius:var(--radius); z-index:0; pointer-events:none;
+    transition: transform var(--dur-layout) var(--ease-standard), width var(--dur-layout) var(--ease-standard);}
+  .panel{background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:20px; display:none;
+    opacity:0; transform:translateY(8px); transition: opacity var(--dur-layout) var(--ease-standard), transform var(--dur-layout) var(--ease-standard);}
   .panel.show{display:block;}
-  input[type=text], input[type=number], input[type=file], select{width:100%; padding:10px 12px; border:1px solid var(--line-strong); border-radius:8px; font-size:14px; background:var(--paper); color:var(--ink);}
-  input:focus, select:focus{outline:none; border-color:var(--amber); box-shadow:0 0 0 3px var(--amber-light);}
+  .panel.show.panel-in{opacity:1; transform:translateY(0);}
+  input[type=text], input[type=number], input[type=file], select{width:100%; padding:10px 12px; border:1px solid var(--line-strong); border-radius:8px; font-size:14px; background:var(--paper); color:var(--ink);
+    transition: border-color 150ms ease, box-shadow 150ms ease;}
+  input:focus, select:focus{outline:none; border-color:var(--ink); box-shadow:0 0 0 3px rgba(17,24,39,0.14);}
   button{cursor:pointer; font-family:inherit;}
-  .btn{padding:10px 16px; border:1px solid var(--ink); border-radius:8px; background:var(--card); font-weight:500; font-size:14px;}
+  .btn{padding:10px 16px; border:1px solid var(--ink); border-radius:8px; background:var(--card); font-weight:500; font-size:14px;
+    transition: transform var(--dur-micro) ease, background-color 150ms ease, border-color 150ms ease, color 150ms ease, box-shadow 150ms ease;}
   .btn.primary{background:var(--ink); color:var(--amber); border-color:var(--ink);}
   .btn.danger{color:var(--red); border-color:var(--red);}
   .btn.icon{padding:9px 12px;}
   .btn:disabled{opacity:0.4; cursor:not-allowed;}
-  .search-hit{display:flex; justify-content:space-between; align-items:center; padding:10px 12px; border:1px solid var(--line); border-radius:8px; margin-bottom:6px; cursor:pointer;}
-  .search-hit:hover{border-color:var(--amber);}
+  .btn:active:not(:disabled){transform:scale(0.96);}
+  .search-hit{display:flex; justify-content:space-between; align-items:center; padding:10px 12px; border:1px solid var(--line); border-radius:8px; margin-bottom:6px; cursor:pointer; transition:border-color 150ms ease, background-color 100ms linear;}
+  .search-hit:hover{border-color:var(--ink); background:var(--paper);}
   .part-name{font-weight:500; font-size:14px;}
   .part-meta{font-family:'Courier New',Consolas,monospace; font-size:11px; color:var(--steel-2); margin-top:2px;}
   .row-line{display:flex; align-items:center; gap:10px; padding:10px 0; border-top:1px solid var(--line); font-size:14px;}
@@ -80,6 +96,47 @@
   .ctx-menu{position:fixed; z-index:9999; background:var(--card); border:1px solid var(--ink); border-radius:8px; box-shadow:0 8px 24px rgba(0,0,0,0.18); min-width:180px; display:none;}
   .ctx-menu button{display:block; width:100%; text-align:left; padding:10px 14px; border:none; background:none; font-size:13px; cursor:pointer;}
   .ctx-menu button:hover{background:var(--amber-light);}
+
+  /* ---- Motion additions ---- */
+
+  /* Data table row hover — instant, subtle. !important beats the inline
+     zebra-stripe background already set per-row in renderInvRows(). */
+  #inv-table tbody tr, #hist-rows tr{transition: background-color 100ms linear;}
+  #inv-table tbody tr:hover, #hist-rows tr:hover{background:var(--line-strong) !important;}
+
+  /* Checkbox check → springy pop. Scales the whole native control since
+     there's no custom-drawn checkmark glyph to isolate (see notes below). */
+  input[type=checkbox]{transition:transform 100ms ease;}
+  input[type=checkbox].check-bounce{animation:checkBounce 280ms cubic-bezier(.34,1.56,.64,1);}
+  @keyframes checkBounce{0%{transform:scale(0);}60%{transform:scale(1.25);}100%{transform:scale(1);}}
+
+  /* Sync now — loading + result flash */
+  #sync-now-btn{transition: border-color 150ms ease, box-shadow 150ms ease, background-color 150ms ease;}
+  #sync-now-btn.is-syncing{cursor:wait;}
+  .sync-spinner{display:inline-block; width:13px; height:13px; vertical-align:-2px; border:2px solid rgba(255,255,255,0.35); border-top-color:currentColor; border-radius:50%; animation:loading-spin 1s linear infinite;}
+  #sync-now-btn:not(.is-syncing) .sync-spinner{display:none;}
+  #sync-now-btn.flash-success{border-color:var(--green); box-shadow:0 0 0 2px var(--green-bg);}
+  #sync-now-btn.flash-error{border-color:var(--red); box-shadow:0 0 0 2px var(--red-bg);}
+
+  /* Complete sale — shake on invalid state, expand-checkmark on success */
+  #complete-sale-btn{position:relative; overflow:hidden;}
+  #complete-sale-btn.shake{animation:btnShake 250ms cubic-bezier(.36,.07,.19,.97);}
+  @keyframes btnShake{
+    10%,90%{transform:translateX(-1px);} 20%,80%{transform:translateX(2px);}
+    30%,50%,70%{transform:translateX(-4px);} 40%,60%{transform:translateX(4px);}
+  }
+  #complete-sale-btn.is-loading{cursor:wait;}
+  #complete-sale-btn.is-success{background:var(--green); border-color:var(--green); color:#fff;}
+  .btn-spinner{display:inline-block; width:14px; height:14px; vertical-align:-2px; border:2px solid rgba(255,255,255,0.35); border-top-color:currentColor; border-radius:50%; animation:loading-spin 1s linear infinite;}
+
+  /* Pagination slide (Next/Prev) — JS drives the transform/opacity inline;
+     this just declares the transition so those inline changes animate. */
+  #inv-table-wrap{transition: transform var(--dur-layout) var(--ease-standard), opacity var(--dur-layout) var(--ease-standard);}
+
+  /* Cart item entrance — height 0→auto isn't natively transitionable, so
+     animateRowIn() measures scrollHeight in JS and animates to that pixel
+     value, then swaps to height:auto once the transition ends. */
+  .row-line{transition: background-color 100ms linear;}
 </style>
 </head>
 <body>
@@ -250,7 +307,7 @@ const CLIENT_CONFIG = {
     <div id="cart-rows"></div>
     <input type="text" id="sell-customer" placeholder="Customer / plate no. (optional)" style="margin-top:10px;">
     <div class="total-bar"><span>Total</span><span class="amt" id="cart-total">₱ 0</span></div>
-    <button class="btn primary" style="width:100%;" onclick="completeSale()">Complete sale</button>
+    <button class="btn primary" id="complete-sale-btn" style="width:100%;" onclick="completeSale()">Complete sale</button>
     <button class="btn" style="width:100%; margin-top:8px;" onclick="undoLastSale()">Undo last sale (5 min window)</button>
     <div id="sale-confirm" class="banner success" style="display:none; margin-top:12px;">Sale recorded — stock deducted automatically</div>
   </section>
@@ -296,7 +353,7 @@ const CLIENT_CONFIG = {
         <button class="btn" id="inv-next-btn" onclick="invNextPage()">Next →</button>
       </div>
     </div>
-    <div style="overflow-x:auto; border:1px solid var(--line-strong); border-radius:8px;">
+    <div id="inv-table-wrap" style="overflow-x:auto; border:1px solid var(--line-strong); border-radius:8px;">
       <table id="inv-table" style="width:100%; border-collapse:collapse; font-size:13px;">
         <thead><tr style="background:var(--ink); color:var(--paper);"></tr></thead>
         <tbody id="inv-rows"></tbody>
@@ -1342,8 +1399,27 @@ async function ctxPurgeBrand(){
 function onPageSizeChange(){ pageState.pageSize = parseInt(document.getElementById('inv-page-size').value,10)||50; refreshInventoryView(true); }
 let invSearchTimer = null;
 function onInvSearchInput(){ clearTimeout(invSearchTimer); invSearchTimer = setTimeout(() => refreshInventoryView(true), 250); }
-async function invNextPage(){ pageState.pageIndex++; await refreshInventoryView(false); }
-async function invPrevPage(){ if (pageState.pageIndex>0){ pageState.pageIndex--; await refreshInventoryView(false); } }
+// Slides #inv-table-wrap out in `direction`, swaps its contents via
+// renderFn, then slides the new contents back in from the opposite side.
+async function slideTableTransition(direction, renderFn){
+  const wrap = document.getElementById('inv-table-wrap');
+  if (!wrap) { await renderFn(); return; }
+  const outX = direction === 'next' ? -16 : 16;
+  const inX = -outX;
+  wrap.style.transform = `translateX(${outX}px)`;
+  wrap.style.opacity = '0';
+  await new Promise(r => setTimeout(r, 150));
+  await renderFn();
+  wrap.style.transition = 'none';
+  wrap.style.transform = `translateX(${inX}px)`;
+  wrap.style.opacity = '0';
+  void wrap.offsetWidth; // force reflow before re-enabling the transition
+  wrap.style.transition = '';
+  wrap.style.transform = 'translateX(0)';
+  wrap.style.opacity = '1';
+}
+async function invNextPage(){ pageState.pageIndex++; await slideTableTransition('next', () => refreshInventoryView(false)); }
+async function invPrevPage(){ if (pageState.pageIndex>0){ pageState.pageIndex--; await slideTableTransition('prev', () => refreshInventoryView(false)); } }
 async function refreshBrandBackupBanner(){
   const banner = document.getElementById('backup-banner');
   if (activeBrand === 'All' || !isAdmin) { banner.style.display = 'none'; return; }
@@ -2154,21 +2230,51 @@ async function addToCart(id){
   const rec = await dbGetById(id);
   if (!rec) return;
   const existing = cart.find(c=>c.id===id);
+  const isNewLine = !existing;
   if (existing) existing.qty += 1; else cart.push({ id, part:rec.part, name:rec.name, price:rec.price, cost:rec.cost, qty:1 });
   document.getElementById('sell-search').value = '';
   document.getElementById('search-results').innerHTML = '';
-  renderCart();
+  renderCart(isNewLine ? id : null);
 }
 function changeQty(id, delta){ const c = cart.find(c=>c.id===id); c.qty += delta; if (c.qty<=0) cart = cart.filter(x=>x.id!==id); renderCart(); }
-function renderCart(){
+// Animates a freshly-inserted row from height 0 → its natural height while
+// fading in. CSS can't transition to `height:auto` directly, so this
+// measures scrollHeight first, animates to that px value, then releases
+// back to `auto` once the transition ends (so later content reflow — e.g.
+// wrapping text on a narrow screen — isn't clipped at a stale pixel height).
+function animateRowIn(el){
+  if (!el) return;
+  const targetHeight = el.scrollHeight;
+  el.style.overflow = 'hidden';
+  el.style.height = '0px';
+  el.style.opacity = '0';
+  el.style.transition = 'none';
+  void el.offsetWidth; // force reflow so the 0-height state actually paints
+  el.style.transition = 'height 200ms cubic-bezier(0.4,0,0.2,1), opacity 200ms cubic-bezier(0.4,0,0.2,1)';
+  requestAnimationFrame(() => {
+    el.style.height = targetHeight + 'px';
+    el.style.opacity = '1';
+  });
+  el.addEventListener('transitionend', function onEnd(e){
+    if (e.propertyName !== 'height') return;
+    el.style.height = 'auto';
+    el.style.overflow = '';
+    el.removeEventListener('transitionend', onEnd);
+  });
+}
+function renderCart(animateNewId){
   const rows = document.getElementById('cart-rows');
   rows.innerHTML = cart.map(c => `
-    <div class="row-line">
+    <div class="row-line" data-cart-id="${c.id}">
       <div style="flex:1;">${escapeHtml(c.name)}</div>
       <button class="qty-btn" onclick="changeQty(${c.id},-1)">−</button><span>${c.qty}</span><button class="qty-btn" onclick="changeQty(${c.id},1)">+</button>
       <span style="width:60px; text-align:right;">₱${c.price*c.qty}</span>
     </div>`).join('') || `<p style="font-size:13px; color:var(--steel-2); padding:8px 0;">Cart is empty. Search a part above.</p>`;
   document.getElementById('cart-total').textContent = '₱ ' + cart.reduce((s,c)=>s+c.price*c.qty,0).toLocaleString();
+  if (animateNewId != null) {
+    const newRow = rows.querySelector(`[data-cart-id="${animateNewId}"]`);
+    if (newRow) animateRowIn(newRow);
+  }
 }
 let lastCompletedSale = null;
 const UNDO_WINDOW_MS = 5*60*1000;
@@ -2592,7 +2698,34 @@ async function setAutoSyncEnabled(on){
   await refreshSyncStatusUI();
   if (on && navigator.onLine) processSyncQueue(true);
 }
+// UI wrapper: shows a spinner while the real sync runs, then flashes the
+// button border green/red so "Sync now" always gives instant visible
+// feedback, not just an alert() after the fact.
 async function manualSyncNow(){
+  const btn = document.getElementById('sync-now-btn');
+  if (btn && btn.classList.contains('is-syncing')) return; // already running
+  const originalHTML = btn ? btn.innerHTML : null;
+  if (btn) {
+    btn.classList.add('is-syncing');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="sync-spinner" aria-hidden="true"></span>';
+  }
+  try {
+    await manualSyncNowImpl();
+    if (btn) btn.classList.add('flash-success');
+  } catch (err) {
+    if (btn) btn.classList.add('flash-error');
+    throw err;
+  } finally {
+    setTimeout(() => {
+      if (!btn) return;
+      btn.classList.remove('is-syncing', 'flash-success', 'flash-error');
+      btn.disabled = false;
+      btn.innerHTML = originalHTML;
+    }, 500);
+  }
+}
+async function manualSyncNowImpl(){
   // The button used to just be greyed out with no explanation whenever
   // there was nothing queued — indistinguishable from "broken" to anyone
   // looking at it. It should always give a real, visible answer.
@@ -3244,8 +3377,48 @@ async function runBranchDiagnostics(){
   alert(out.join('\n\n'));
   console.log(out.join('\n'));
 }
+// UI wrapper around completeSaleImpl(): shakes the button on an invalid
+// state (empty cart), shows a spinner while the sale is written, then
+// either expands into a green checkmark (success) or shakes red (an
+// exception actually escaped completeSaleImpl — e.g. IndexedDB failure).
+// A shortfall confirm() the user cancels is treated as neither: it's a
+// deliberate abort, not an error, so no animation plays for it.
 async function completeSale(){
-  if (!cart.length) return;
+  const btn = document.getElementById('complete-sale-btn');
+  if (!cart.length) {
+    if (btn) { btn.classList.remove('shake'); void btn.offsetWidth; btn.classList.add('shake'); }
+    return;
+  }
+  const originalHTML = btn ? btn.innerHTML : null;
+  if (btn) {
+    btn.classList.add('is-loading');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="btn-spinner" aria-hidden="true"></span> Completing…';
+  }
+  try {
+    const completed = await completeSaleImpl();
+    if (btn) {
+      if (completed) {
+        btn.classList.add('is-success');
+        btn.innerHTML = '✓ Sale complete';
+      } else {
+        btn.innerHTML = originalHTML; // user cancelled the shortfall confirm — just reset
+      }
+    }
+  } catch (err) {
+    if (btn) { btn.innerHTML = originalHTML; btn.classList.remove('shake'); void btn.offsetWidth; btn.classList.add('shake'); }
+    throw err;
+  } finally {
+    if (btn) {
+      setTimeout(() => {
+        btn.classList.remove('is-loading', 'is-success', 'shake');
+        btn.disabled = false;
+        btn.innerHTML = originalHTML;
+      }, 900);
+    }
+  }
+}
+async function completeSaleImpl(){
   const customerEl = document.getElementById('sell-customer');
   const customer = customerEl ? customerEl.value.trim() : '';
 
@@ -3259,7 +3432,7 @@ async function completeSale(){
   if (shortfalls.length) {
     const msg = shortfalls.map(l => `${l.name}: have ${recMap[l.id]?recMap[l.id].qty:0}, selling ${l.qty}`).join('\n');
     const ok = confirm(`This sale would push stock negative:\n\n${msg}\n\nOverride and complete anyway? (This will be logged.)`);
-    if (!ok) return;
+    if (!ok) return false;
   }
 
   const lines = []; let totalRev=0, totalCost=0;
@@ -3317,6 +3490,7 @@ async function completeSale(){
   const banner = document.getElementById('sale-confirm');
   banner.style.display = 'block';
   setTimeout(()=> banner.style.display='none', 2500);
+  return true;
 }
 async function undoLastSale(){
   if (!lastCompletedSale || lastCompletedSale.voided) { alert('Nothing to undo.'); return; }
@@ -3466,9 +3640,17 @@ async function loadAccountRoster(){
   }
 }
 function showPanel(name){
-  document.querySelectorAll('.panel').forEach(p => p.classList.remove('show'));
-  document.getElementById('panel-'+name).classList.add('show');
+  document.querySelectorAll('.panel').forEach(p => { p.classList.remove('show'); p.classList.remove('panel-in'); });
+  const panel = document.getElementById('panel-'+name);
+  panel.classList.add('show');
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+  // Double rAF: the first frame lets the browser actually paint the
+  // just-added .show state (opacity:0, translateY(8px)) before the second
+  // frame adds .panel-in — otherwise the browser can coalesce both class
+  // changes into one paint and the transition never has a start state to
+  // animate from.
+  requestAnimationFrame(() => requestAnimationFrame(() => panel.classList.add('panel-in')));
+  updateTabSlider();
   if (name === 'profit') renderProfit();
   if (name === 'history') renderHistory();
   if (name === 'accounts') { renderAccounts(); refreshBranchAccountsUI(); }
@@ -3478,6 +3660,36 @@ document.querySelectorAll('nav.tabs .tab').forEach(btn => btn.addEventListener('
   showPanel(btn.dataset.tab);
   if (btn.dataset.tab === 'inventory') { refreshBrandSheets(); refreshBrandBackupBanner(); refreshInventoryView(true); }
 }));
+// Sliding pill behind the active Sell/Inventory/History/… tab.
+function updateTabSlider(){
+  const nav = document.getElementById('staff-tabs');
+  if (!nav) return;
+  let slider = nav.querySelector('.tab-slider');
+  const wasNew = !slider;
+  if (!slider) {
+    slider = document.createElement('div');
+    slider.className = 'tab-slider';
+    nav.insertBefore(slider, nav.firstChild);
+  }
+  const active = nav.querySelector('.tab.active');
+  if (!active) return;
+  if (wasNew) slider.style.transition = 'none'; // no slide-in from nowhere on first paint
+  slider.style.width = active.offsetWidth + 'px';
+  slider.style.transform = `translateX(${active.offsetLeft}px)`;
+  if (wasNew) requestAnimationFrame(() => requestAnimationFrame(() => { slider.style.transition = ''; }));
+}
+updateTabSlider();
+window.addEventListener('resize', updateTabSlider);
+// Springy checkbox pop on check (delegated so it also covers checkboxes
+// rendered later by inventory/import screens, e.g. inv-show-archived,
+// imp-update-qty-existing).
+document.addEventListener('change', (e) => {
+  const el = e.target;
+  if (!el || el.type !== 'checkbox') return;
+  el.classList.remove('check-bounce');
+  void el.offsetWidth;
+  if (el.checked) el.classList.add('check-bounce');
+});
 function setRoleUI(admin){
   isAdmin = admin;
   document.querySelectorAll('.admin-only').forEach(el => el.style.display = admin ? '' : 'none');
